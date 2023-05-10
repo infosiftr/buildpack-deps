@@ -5,7 +5,17 @@ self="$(basename "$BASH_SOURCE")"
 cd "$(dirname "$(readlink -f "$BASH_SOURCE")")"
 
 if [ "$#" -eq 0 ]; then
-	versions="$(jq -r 'keys | map(@sh) | join(" ")' versions.json)"
+	versions="$(jq -r '
+		keys_unsorted
+		| [
+			# TODO solve hard problems here
+			(map(select(startswith("debian")) | sort))[],
+			(map(select(startswith("ubuntu")) | sort))[],
+			(map(select(startswith("alpine")) | sort_by(split("/")[1] | tonumber) | reverse))[]
+		]
+		| map(@sh)
+		| join(" ")
+	' versions.json)"
 	eval "set -- $versions"
 fi
 
@@ -69,17 +79,21 @@ for version; do
 	# debian, ubuntu
 	dist="$(dirname "$version")"
 
-	versionAliases=( "$codename" )
-	suite="$(jq -r '.[env.version].suite // empty' versions.json)"
-	if [ -n "$suite" ]; then
-		versionAliases+=( "$suite" )
+	if [ "$dist" != 'alpine' ]; then
+		versionAliases=( "$codename" )
+		suite="$(jq -r '.[env.version].suite // empty' versions.json)"
+		if [ -n "$suite" ]; then
+			versionAliases+=( "$suite" )
+		fi
+		if [ "$suite" = 'stable' ]; then
+			versionAliases+=( latest )
+		fi
+	else
+		versionAliases=( "$dist$codename" )
 	fi
 
-	if [ "$suite" = 'stable' ]; then
-		versionAliases+=( latest )
-	fi
-
-	parent="$(awk 'toupper($1) == "FROM" { print $2 }' "$version/curl/Dockerfile")"
+	baseVariant="$(jq -r '.[env.version].variants[0]' versions.json)"
+	parent="$(awk 'toupper($1) == "FROM" { print $2 }' "$version/$baseVariant/Dockerfile")"
 	arches="${parentRepoToArches[$parent]}"
 
 	variants="$(jq -r '.[env.version].variants | map(@sh) | join(" ")' versions.json)"

@@ -40,9 +40,13 @@ for version; do
 	eval "variants=( $variants )"
 
 	for variant in "${variants[@]}"; do
-		template="Dockerfile${variant:+-$variant}.template"
 		dir="$version${variant:+/$variant}"
 		mkdir -p "$dir"
+
+		if [ "$dist" = 'alpine' ]; then
+			variant="$dist${variant:+-$variant}"
+		fi
+		template="Dockerfile${variant:+-$variant}.template"
 
 		echo "processing $dir ..."
 

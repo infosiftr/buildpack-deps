@@ -1,0 +1,11 @@
+FROM {{ env.dist }}:{{ env.codename }}
+{{ if .updates | length > 0 then ( -}}
+
+# explicitly install base image package updates from Alpine
+RUN set -eux; \
+	apk add --no-cache \
+{{ .updates | map( -}}
+		{{ @sh }} \
+{{ ) | join("") -}}
+	;
+{{ ) else "" end -}}
